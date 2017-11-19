@@ -1,0 +1,91 @@
+=================================== ZOOKEEPER MULTI NODE CLUSTER INSTALLATION ================================================
+Please refer the document 'standalone_install' to setup zookeeper instance in each machine.
+Once the zookeper is setup in each machine using, follow the below steps for cluster setup.
+
+Step 1: Get the ip address of each node and assign unique id to each unix box/vm
+
+Here say we have two vm/unix machines each having ip address as below: 
+192.168.81.130
+192.168.81.131
+
+Lets assign a unique ID to each computer (ID taken from 1 to 255), say, 
+we assign 192.168.81.130 with id = 1, and assign 192.168.81.131 with id = 2. 
+
+Step 2: Creation of 'myid' file in dataDir
+Log into the terminal of each computer, 
+create a "zookeeper" folder under /var directory (/var/zookeeper/) and 
+create a myid file in it that shall contain the unique id assigned to the computer, by running the following commands:
+
+> cd /var
+> sudo mkdir zookeeper
+> sudo chmod -R 777 zookeeper
+> cd zookeeper
+> sudo touch myid
+> sudo gedit myid
+
+In the myid opened, put the unique id and save the file. For example the content of myid file on 192.168.81.130 is
+
+1
+
+and the content of myid file on 192.168.81.131 is 
+
+2
+
+Step 3: Now navigate to the ZK_HOME directory on each computer and update the zoo.cfg in the conf sub-directory, by running the following commnads:
+> cd $ZK_HOME
+> cd conf
+> gedit zoo.cfg
+
+In the zoo.cfg file, write the following as its content:
+
+tickTime=2000
+dataDir=/var/zookeeper
+clientPort=2181
+initLimit=5
+syncLimit=2
+server.1=192.168.1.12:2888:3888  //Basically here the ip:peerPort:leaderPort of machine 1
+server.2=192.168.1.13:2888:3888  //Basically here the ip:peerPort:leaderPort of machine 2
+
+
+//Note: the above list includes all the servers including the one in which the zoo.cfg file resides
+//Here server parameter is in the form
+Server.X=hostname/ip:peerPort:leaderPort
+where
+X -> Server Unique id
+ip -> host/ip of each machine 
+peerPort -> TCP port over which servers in ensemble communicate with each other
+leaderPort -> TCP port over which leader election is performed
+
+Now Save and close the zoo.cfg file.
+
+Step 4: Run start the zookeeper on each computer by running the following commands in their terminal:
+
+> cd $ZK_HOME
+> bin/zkServer.sh start
+
+To check the status of the zookeeper cluster, type the following command in each computers' terminal:
+> cd $ZK_HOME
+> bin/zkServer.sh status
+
+To stop a zookeeper on a computer, run the following command:
+> cd $ZK_HOME
+> bin/zkServer.sh stop
+
+
+///----- COmmon Problems ----////
+Problem 1: Error contacting service. It is probably not running.
+
+When this message appeared, it may be because one of t8he computer is not connected to the network (e.g. the ethernet cable is loose). In this case, try to ping each computer to see if they are connected.
+
+Another caution is to make sure the the /var/zookeeper folder on each computer has write permission (e.g. by running the "sudo chmod -R 777 /var/zookeeper" command in the terminal)
+
+--- Problem 1 Solution for VMs: 
+Go to VM Setting --> Go to Netwok Adapter Setting --> In 'Network Connection' section select 'Bridged: Connection directly to the physical network' 
+Also
+Check the check box for : Replication physical network connection sate
+
+Do this for all VMs and there you are done. Vola!
+------------
+Note : The ip for every VM changes, hence everytime you start a VM, you may need to change the ip for each zookeeper server/vm in zoo.cfg in each vm. 
+I have not tried, but you can assign the static ip to each vm and get rid of this problem also.
+==================================================================================================================================
