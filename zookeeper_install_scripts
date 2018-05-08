@@ -1,0 +1,858 @@
+============================== zk_stop.sh =======================================
+#!/bin/sh
+# This is Apache Zookeeper Server Stop Script
+# Script is zk_stop.sh
+# This script automatically starts apache zookeeper server
+# on one node
+
+echo "========================="
+echo "Stopping Apache Zookeeper"
+echo "========================="
+
+################# INCLUDES #################################
+source /appl/scripts/variables.sh
+
+################ VARIABLES #################################
+spin="$scripts_dir/$name_spinner_script"
+loc_zk_ins_dir="$zk_dir/$name_zk_install_dir"
+loc_zk_bin_dir="$loc_zk_ins_dir/bin"
+loc_zk_start_logs="$zk_srvr_logs_dir/$name_zk_srvr_start_logs"
+loc_zk_status_cmd="zkServer.sh status"
+
+############### Functions ##################################
+#_stat Function checks if the command has been executed
+#successfully or not
+_stat(){
+	if [ $1 -ne 0 ]; then
+        	echo "Failed:: To perform Action $2"
+		exit 1
+	else
+        	echo "Successful:: Performed the action: $2"
+	fi
+}
+
+_srvr_stat(){
+        if [ $1 -ne 0 ]; then
+                echo "SUCCESSFUL::: Completed the action: $2"
+        else
+                echo "FAILED:: Could not Complete the action: $2"
+		echo "Retry the Stop Script..."
+		exit 1
+        fi
+}
+
+############# Stopping Zookeeper ########################
+echo "Traversing Zookeeper..."
+cd $loc_zk_bin_dir
+_stat $? TRAVERSING_TO_ZK_BIN COULDNOT_TRAVERSE_ZK_BIN_DIR TRAVESED_TO_ZK_BIN
+
+echo "Initiating Script..."
+sh $loc_zk_bin_dir/zkServer.sh stop
+_stat $? STOPPING_ZOOKEEPER_SCRIPT
+
+echo "Verifying the stop execution...."
+echo srvr | nc localhost 2181
+_srvr_stat $? STOPPING_ZOOKEEPER_SERVER
+
+echo "Zookeeper Stopped Successfully"
+exit 0
+
+================================== variables.sh =====================================
+#!/bin/sh
+#This script contains all the varaibles required for 
+#Apache Zookeeper & KAFKA setup. 
+#The script contains names and source and destination
+#directory locations of the resources.
+echo "Zookeeper/KAFKA Variable Shell Included"
+########## ZK CLUSTER SETUP VARIABLE SCRIPT #########
+#----------------- Name Variables -------------------
+name_base_dir="appl"
+name_apps_dir="apps1"
+name_logs_dir="logs1"
+name_data_dir="data1"
+name_scripts_dir="scripts"
+name_zk_dir="zookeeper"
+name_kafka_dir="kafka"
+name_zk_logs_dir="zk_logs"
+name_kafka_logs_dir="kafka_logs"
+name_scripts_logs_dir="inst_script_logs"
+name_zk_tarball="zookeeper-3.4.11.tar.gz"
+name_kafka_tarball="kafka_2.11-1.1.0.tgz"
+name_res_dir="resources"
+name_variable_script="variables.sh"
+name_spinner_script="spinner.sh"
+name_zk_install_dir="zookeeper-3.4.11"
+name_kafka_install_dir="kafka_2.11-1.1.0"
+name_zk_config_file="zoo.cfg"
+name_zk_myid_file="myid"
+name_kf_server_file="server.properties"
+name_kf_log4j_file="log4j.properties"
+name_inst_logs="script.install.logs"
+name_zk_srvr_start_logs="zk.srvr.start.logs"
+name_kafka_srvr_start_logs="kafka.srvr.start.logs"
+#----------------- Directory Variables --------------
+#------------------------------
+app_base_dir="/appl/apps1"
+data_base_dir="/appl/data1"
+log_base_dir="/appl/logs1"
+#------------------------------
+scripts_dir="/appl/scripts"
+
+zk_dir="$app_base_dir/zookeeper"
+kafka_dir="$app_base_dir/kafka"
+
+zk_logs_dir="$data_base_dir/zk_data"
+kafka_logs_dir="$data_base_dir/kafka_data"
+zk_srvr_logs_dir="$log_base_dir/zk_logs"
+kafka_srvr_logs_dir="$log_base_dir/kafka_logs"
+
+script_logs_dir="$log_base_dir/inst_script_logs"
+
+res_dir="$scripts_dir/resources"
+#------------------ Pre Installation Variables ------
+chk_force_install="1"
+chk_zk_version="zookeeper-3.4.11"
+chk_kf_version="kafka_2.11-1.1.0"
+
+echo "Zookeeper/KAFKA Variable Shell: All Variables Included"
+
+===================================== zk_config.sh =================================
+#!/bin/sh
+# This is zk_config.sh script.
+# This script configures the zookeeper installation to be
+# started and running on.
+echo "#######################################################"
+echo "#                                                     #"
+echo "############# Zookeeper Configuration #################"
+echo "#                                                     #"
+echo "#######################################################"
+
+############ INCLUDES #######################################
+source /appl/scripts/variables.sh
+
+############ VARIABLES #############################################
+spin="$scripts_dir/$name_spinner_script"
+loc_zk_ins_dir="$zk_dir/$name_zk_install_dir"
+loc_zk_conf_dir="$loc_zk_ins_dir/conf"
+
+############ FUNCTIONS #############################################
+#_stat Function checks if the command has been executed successfully
+#or not
+_stat(){
+if [ $1 -ne 0 ]; then
+        echo "FAILED::: Could not complete the action: $2"
+        echo "Exiting Installation Abruptly..."
+        exit 1
+else
+        echo "Successfully Performed the action: $2"
+        ls -lrt
+fi
+}
+
+_file_stat(){
+	if [ -e $1 ]; then
+        	echo "File: $1 is present in Data Directory"
+	        ls -lrt $1
+	else
+        	echo "FAILED::: Could not find the file: $1"
+	        echo "Exiting Installation Abruptly..."
+        	exit 1
+	fi
+}
+
+########### STEP1:Zookeeper Configuration & myid File Copy ######################
+echo
+echo "----- Installing Zookeeper Configuration File -----"
+sh $spin
+
+echo "Current Working Directory is:"
+pwd
+echo "Traversing to Resource Directory"
+cd $res_dir
+_stat $? TRAVERSING_TO_RESOURCE_DIRECTORY
+echo "Current Working Directory is:"
+pwd
+
+echo "Finding the Configuration File"
+_file_stat $name_zk_config_file
+
+echo "Installing the Configuration File to installation folder"
+echo "Destination Directory: $loc_zk_conf_dir"
+cp $name_zk_config_file $loc_zk_conf_dir
+_stat $? INSTALLING_ZOOKEEPER_CONFIGURATION_FILE
+echo "----- Zookeeper Configuration File Installation Successful -----"
+
+echo
+echo "----- Installing myid file -----"
+sh $spin
+
+echo "Current Working Directory is:"
+pwd
+echo "Traversing Back to resource directory if not already"
+cd $res_dir
+_stat $? TRAVERSING_TO_RESOURCE_DIRECTORY
+
+echo "Finding myid File"
+_file_stat $name_zk_myid_file
+
+echo "Installing the myid file to Data Folder"
+cp $name_zk_myid_file $zk_logs_dir
+_stat $? INSTALLING_MYID_FILE_TO_DATA_DIRECTORY
+echo "----- Zookeeper myid File Installation Successful ----"
+
+########### STEP2: Verifying Zookeeper Configuration Installation ###########
+echo
+echo "----- Verifying Zookeeper Configuration Installation -----"
+sh $spin
+
+echo "Traversing to Zookeeper Installation Configuration Directory: $loc_zk_conf_dir"
+cd $loc_zk_conf_dir
+_stat $? TRAVERSE_ZK_INSTALLATION_CONFIG_DIRECTORY
+
+echo "Present Working Directory: "
+pwd
+echo "Checking for the installed Config File"
+_file_stat $name_zk_config_file
+
+echo "Changing Permission for Configuration File"
+chmod 777 $name_zk_config_file
+_stat $? CHANGING_PERMISSION_FOR_CONFIGURATION_FILE
+echo "------------------ CONFIGURATION VERIFICATION SUCCESSFUL ----------------"
+
+########### STEP3: Verifying Zookeeper myid File Installation ###########
+echo
+echo "----- Verifying Zookeeper myid File Installation -----"
+sh $spin
+
+echo "Traversing to Zookeeper Data Directory: $zk_logs_dir"
+cd $zk_logs_dir
+_stat $? TRAVERSING_TO_ZK_DATA_DIRECTORY
+_file_stat $name_zk_myid_file
+
+echo "----- ZOOKEEPER MYID FILE VERIFICATION COMPLETES SUCCESSFULLY -----"
+echo "########### Zookeeper Configuration Completes Successfully ###########"
+exit 0
+
+================================== zk_dir_inst.sh =============================
+#!/bin/sh
+# This is zk_config.sh script.
+# This script configures the zookeeper installation to be
+# started and running on.
+echo "#######################################################"
+echo "#                                                     #"
+echo "############# Zookeeper Configuration #################"
+echo "#                                                     #"
+echo "#######################################################"
+
+############ INCLUDES #######################################
+source /appl/scripts/variables.sh
+
+############ VARIABLES #############################################
+spin="$scripts_dir/$name_spinner_script"
+loc_zk_ins_dir="$zk_dir/$name_zk_install_dir"
+loc_zk_conf_dir="$loc_zk_ins_dir/conf"
+
+############ FUNCTIONS #############################################
+#_stat Function checks if the command has been executed successfully
+#or not
+_stat(){
+if [ $1 -ne 0 ]; then
+        echo "FAILED::: Could not complete the action: $2"
+        echo "Exiting Installation Abruptly..."
+        exit 1
+else
+        echo "Successfully Performed the action: $2"
+        ls -lrt
+fi
+}
+
+_file_stat(){
+	if [ -e $1 ]; then
+        	echo "File: $1 is present in Data Directory"
+	        ls -lrt $1
+	else
+        	echo "FAILED::: Could not find the file: $1"
+	        echo "Exiting Installation Abruptly..."
+        	exit 1
+	fi
+}
+
+########### STEP1:Zookeeper Configuration & myid File Copy ######################
+echo
+echo "----- Installing Zookeeper Configuration File -----"
+sh $spin
+
+echo "Current Working Directory is:"
+pwd
+echo "Traversing to Resource Directory"
+cd $res_dir
+_stat $? TRAVERSING_TO_RESOURCE_DIRECTORY
+echo "Current Working Directory is:"
+pwd
+
+echo "Finding the Configuration File"
+_file_stat $name_zk_config_file
+
+echo "Installing the Configuration File to installation folder"
+echo "Destination Directory: $loc_zk_conf_dir"
+cp $name_zk_config_file $loc_zk_conf_dir
+_stat $? INSTALLING_ZOOKEEPER_CONFIGURATION_FILE
+echo "----- Zookeeper Configuration File Installation Successful -----"
+
+echo
+echo "----- Installing myid file -----"
+sh $spin
+
+echo "Current Working Directory is:"
+pwd
+echo "Traversing Back to resource directory if not already"
+cd $res_dir
+_stat $? TRAVERSING_TO_RESOURCE_DIRECTORY
+
+echo "Finding myid File"
+_file_stat $name_zk_myid_file
+
+echo "Installing the myid file to Data Folder"
+cp $name_zk_myid_file $zk_logs_dir
+_stat $? INSTALLING_MYID_FILE_TO_DATA_DIRECTORY
+echo "----- Zookeeper myid File Installation Successful ----"
+
+########### STEP2: Verifying Zookeeper Configuration Installation ###########
+echo
+echo "----- Verifying Zookeeper Configuration Installation -----"
+sh $spin
+
+echo "Traversing to Zookeeper Installation Configuration Directory: $loc_zk_conf_dir"
+cd $loc_zk_conf_dir
+_stat $? TRAVERSE_ZK_INSTALLATION_CONFIG_DIRECTORY
+
+echo "Present Working Directory: "
+pwd
+echo "Checking for the installed Config File"
+_file_stat $name_zk_config_file
+
+echo "Changing Permission for Configuration File"
+chmod 777 $name_zk_config_file
+_stat $? CHANGING_PERMISSION_FOR_CONFIGURATION_FILE
+echo "------------------ CONFIGURATION VERIFICATION SUCCESSFUL ----------------"
+
+########### STEP3: Verifying Zookeeper myid File Installation ###########
+echo
+echo "----- Verifying Zookeeper myid File Installation -----"
+sh $spin
+
+echo "Traversing to Zookeeper Data Directory: $zk_logs_dir"
+cd $zk_logs_dir
+_stat $? TRAVERSING_TO_ZK_DATA_DIRECTORY
+_file_stat $name_zk_myid_file
+
+echo "----- ZOOKEEPER MYID FILE VERIFICATION COMPLETES SUCCESSFULLY -----"
+echo "########### Zookeeper Configuration Completes Successfully ###########"
+exit 0
+
+====================== zk_dir_inst.sh ===========================================
+#!/bin/sh
+#This is zk_dir_inst.sh script
+#This script install the required directory structure for 
+#Apache Zookeeper installation on a single node.
+echo "#############################################################"
+echo "#                                                           #"
+echo "############### ZOOKEEPER Directory Structure Setup #########"
+echo "#                                                           #"
+echo "#############################################################"
+
+############ INCLUDES #############################################
+source /appl/scripts/variables.sh
+
+############ VARIABLES #############################################
+spin="$scripts_dir/$name_spinner_script"
+
+############ FUNCTIONS #############################################
+#_stat Function checks if the command has been executed successfully
+#or not
+_stat(){
+if [ $1 -ne 0 ]; then
+        echo "FAILED::: Could not complete the action: $2"
+        echo "Exiting Installation Abruptly..."
+        exit 1
+else
+        echo "Successfully Performed the action: $2"
+        ls -lrt
+fi
+}
+
+#_dir_stat Function checks if directory exists, if yes return 2, else 1
+_dir_stat(){
+if [ -d $1 ]; then
+        echo "-----------------------------------------------------"
+        echo "Directory: $1, already exists....."
+        echo "-----------------------------------------------------"
+	return 2
+else
+        echo "Directory does not exist, proceed with installation"
+	return 1
+fi
+}
+
+#_dir_mk Function Creates a directory
+_dir_mk(){
+	echo "$2"
+	mkdir $1
+	_stat $? $2
+}
+
+########### STEP1: Creating ZK_Apps Directory ###############################
+echo
+echo "----- Installing ZK_Apps Directory -----"
+sh $spin
+
+echo "Changing Working Directory to Apps Base Directory"
+
+cd $app_base_dir
+_stat $? Changing_To_App_Base_Directory
+
+echo "Current Working Directory is:"
+pwd
+
+echo "Checking for existing zk_apps directory, if any"
+_dir_stat $zk_dir
+
+if [ $? == 2 ]; then
+	echo "ZK_Apps Directory Already Exists"
+else
+	_dir_mk $zk_dir INSTALLING_ZK_APPS_DIRECTORY
+	echo "----- Successfully Installed Zookeeper Application Directory -----"
+fi
+
+########### STEP2: Creating Zookeeper Data Directory #########################
+echo
+echo "----Installing Zookeeper Data Directory----"
+sh $spin
+
+echo "Changing Current Working Directory to Data Base Directory"
+cd $data_base_dir
+_stat $? Changing_To_Data_Base_Directory
+
+echo "Checking if zookeeper data directory already exists"
+_dir_stat $zk_logs_dir
+
+if [ $? == 2 ]; then
+        echo "Zookeeper Data Directory Already Exists"
+else
+        _dir_mk $zk_logs_dir INSTALLING_ZK_DATA_DIRECTORY
+        echo "----- Successfully Installed Zookeeper Data Directory -----"
+fi
+
+########### STEP3: Creating Zookeeper Logs Directory ##########################
+echo
+echo "----Installing Zookeeper Logs Directory----"
+sh $spin
+
+echo "Changing Current Working Directory to Logs Base Directory"
+cd $log_base_dir
+_stat $? Changing_To_Logs_Base_Directory
+
+echo "Checking if zookeeper logs directory already exists"
+_dir_stat $zk_srvr_logs_dir
+
+if [ $? == 2 ]; then
+	echo "Zookeeper Logs Directory Already Exists"
+else
+	_dir_mk $zk_srvr_logs_dir INSTALLING_ZOOKEEPER_LOGS_DIRECTORY
+	echo "----- Successfully Installed Logs Directory -----"
+fi
+
+########### STEP4: Zookeeper Installation Script Logs ###############
+echo
+echo "-------- Installing Script Logs Directory ---------"
+sh $spin
+
+echo "Current Working Directory is:"
+pwd
+echo "Changing to Logs Base Directory"
+cd $log_base_dir
+_stat $? Changing_To_Logs_Directory
+echo "Current Working Directory is:"
+pwd
+
+echo "Checking if script logs directory already exists"
+_dir_stat $script_logs_dir
+
+if [ $? == 2 ]; then
+	echo "Zookeeper Script Installation Logs Directory Already Exists"
+else
+	_dir_mk $script_logs_dir INSTALLING_ZOOKEEPER_SCRIPTS_LOGS_DIRECTORY
+	echo "-----Successfully Installed Scripts Logs Directory----"
+fi
+
+echo "Verifying Installation Scripts Log Directory for verification"
+cd $script_logs_dir
+_stat $? VERIFYING_ZOOKEEPER_INSTALLTION_SCRIPTS_LOGS_DIRECTORY
+echo "Current Working Directory is: "
+pwd
+echo "----- Successfully Installed Script Logs Directory -----"
+echo "############### DIRECTORY STRUCTURE SETUP SUCCESSFULLY ###########"
+exit 0
+
+
+=========================== zk_extract.sh ======================================
+#!/bin/sh
+# This is zk_extarct.sh script.
+# This script extracts the zookeeper tarball to the 
+# destination installation directory on a single node.
+echo "#######################################################"
+echo "#                                                     #"
+echo "##############  Zookeeper Extraction  #################
+echo "#                                                     #"
+echo "#######################################################"
+
+############ INCLUDES #######################################
+source /appl/scripts/variables.sh
+
+############ VARIABLES #############################################
+spin="$scripts_dir/$name_spinner_script"
+tarball="$res_dir/$name_zk_tarball"
+#ext_logs="$script_logs_dir/script_extract.log"
+loc_zk_ins_dir="$zk_dir/$name_zk_install_dir"
+############ FUNCTIONS #############################################
+#_stat Function checks if the command has been executed successfully
+#or not
+_stat(){
+if [ $1 -ne 0 ]; then
+        echo "FAILED::: Could not complete the action: $2"
+        echo "Exiting Installation Abruptly..."
+        exit 1
+else
+        echo "Successfully Performed the action: $2"
+        ls -lrt
+fi
+}
+
+#_dir_stat Function checks if directory exists, if yes return 2, else 1
+_dir_stat(){
+if [ -d $1 ]; then
+        echo "-----------------------------------------------------"
+        echo "Directory: $1, already exists....."
+        echo "-----------------------------------------------------"
+        return 2
+else
+        echo "Directory does not exist, proceed with installation"
+        return 1
+fi
+}
+
+#_dir_mk Function Creates a directory
+_dir_mk(){
+        echo "$2"
+        mkdir $1
+        _stat $? $2
+}
+
+########### STEP1: ZOOKEEPER TARBALL EXTRACTION ###########################
+echo
+echo "----- Finding Zookeeper tarball -----"
+sh $spin
+
+echo "Traversing to Resource Directory"
+cd $res_dir
+_stat $? Changing_To_Resource_Directory
+
+echo "Inside Resource Directory:"
+pwd
+echo "Finding Zookeeper Tarball"
+
+if [ -f "$name_zk_tarball" ]; then
+        echo "Zookeeper Tar Ball Found: $name_zk_tarball"
+        ls -lrt zookeeper*
+else
+        echo "Zookeeper Tar Ball: $name_zk_tarball --- not found"
+	echo "Exiting Installation Abruptly..."
+        exit 1
+fi
+
+echo "Zookeeper Tar Ball Location: $res_dir"
+echo "Present Working Directory is:"
+pwd
+
+echo "Zookeeper Installation Directory: $zk_dir"
+echo "----- Installing Zookeeper -----"
+sh $spin
+
+echo "Checking if the installation already exists..."
+_dir_stat $loc_zk_ins_dir
+
+if [ $? == 2 ]; then
+        echo "Installation Directory Already Exists for given version"
+	echo "...Over-riding Installation..."
+else
+        echo "----- Installation Directory does not exist for given version -----"
+fi
+
+echo "Extracting the zookeeper tarball to installation directory..."
+#tar -xvzf $tarball --directory=$zk_dir >> $ext_logs
+tar -xvzf $tarball --directory=$zk_dir
+
+_stat $? INSTALLING_ZOOKEEPER_TO_INSTALLATION_DIRECTORY
+
+############ STEP 2:Verification of Zookeeper Installation #################
+echo
+echo "----- Verifying Zookeeper Installation -----"
+sh $spin
+
+echo "Current Working Directory is:"
+pwd
+echo "Travesing to Installation Directory....."
+cd $zk_dir
+_stat $? TRAVERSED_TO_ZOOKEEPER_INSTATTION_DIRECTORY
+echo "Current Working Directory is:"
+pwd
+echo "Checking if the installation exists..."
+
+if [ -d "$name_zk_install_dir" ]; then
+        echo "----------------------------------------------------"
+        echo "Zookeeper extracted directory exists"
+        ls -lrt
+        echo "----------------------------------------------------"
+else
+        echo "Zookeeper extracted directory does not exist"
+        ls -lrt
+        echo "Exiting Installation Abruptly..."
+        exit 1
+fi
+
+echo "Changing Permission of the zookeeper installation directory"
+chmod 777 $name_zk_install_dir
+_stat $? CHANGING_PERMISSION_ON_ZOOKEEPER_INSTALLATION_DIRECTORY
+echo
+echo "VERIFICATION COMPLETES SUCCESSFULLY"
+echo "############### ZOOKEEPER EXTRACTED SUCCESSFULLY ###############"
+exit 0
+
+
+===================================== zk_install.sh =======================
+#!/bin/sh
+# This is the master script for zookeeper installtion
+# Script is zk_install.sh
+# This script executes all the other scripts sequentially
+# to complete the zookeeper installation in an automated way
+
+echo "================================================="
+echo "  ____       __     _   _   _   _____   _______  "
+echo " /__  /     / /    |_| | \ | | |  ___| |__   __| "
+echo "   / /     / /---  | | |  \| | | |___     | |"
+echo "  / /     /  '__/  | | |     | |____ |    | |"
+echo " / /___  / /\ \    | | | |\  |  ___| |    | |"
+echo "/_____/ /_/  \_\   |_| |_| \_| |_____|    |_|  version 3.4.11"
+echo "================================================"
+
+############ INCLUDES #######################################
+source /appl/scripts/variables.sh
+
+############ VARIABLES #####################################
+spin="$scripts_dir/$name_spinner_script"
+loc_inst_logs_d="$script_logs_dir/$name_inst_logs.zk.dir"
+loc_inst_logs_e="$script_logs_dir/$name_inst_logs.zk.extract"
+loc_inst_logs_c="$script_logs_dir/$name_inst_logs.zk.config"
+
+########### FUNCTIONS ######################################
+#_stat Function checks if the command has been executed 
+#successfully or not
+
+_stat(){
+if [ $1 -ne 0 ]; then
+        echo "FAILED::: Could not complete the action: $2"
+        echo "Exiting Installation Abruptly..."
+        exit 1
+else
+        echo "Successfully Performed the action: $2"
+        ls -lrt
+fi
+}
+echo
+echo "----- Starting The Zookeeper Installation -----"
+sh $spin
+########## PRE INSTALLATION STEP ##########################
+#echo
+#echo "@@@@@@@@@@@@@@@@@@@ Pre-Installation Checks @@@@@@@@@@@@@@@@"
+#sh ./zk_pre_ins.sh $chk_force_install
+#_stat $? ZOOKEEPER_PRE_INSTALLATION_CHECKS
+#echo "@@@@@@@@@@@@@@@@@@@ Pre-Installation Checks Successful @@@@@@@@@@@@@@@@@@"
+
+########### STEP1: Directory Structure Creation ############
+echo
+echo "@@@@@@@@@@@@@@@@@@@ Starting The Directory Installation @@@@@@@@@@@@@@@@"
+sh ./zk_dir_inst.sh
+_stat $? ZOOKEEPER_DIRECTORY_INSTALLATION_PROCESS
+echo "@@@@@@@@@@@@@@@@@@@ Directory Installation Successful @@@@@@@@@@@@@@@@@@"
+
+################ STEP2: Zookeeper Extraction ################
+echo
+echo "@@@@@@@@@@@@@@@@@@@ Starting The Zookeeper Extraction @@@@@@@@@@@@@@@@@@"
+sh ./zk_extract.sh | tee -a $loc_inst_logs_e
+_stat $? ZOOKEEPER_EXTRACTION_PROCESS
+echo "@@@@@@@@@@@@@@@@@@@ The Zookeeper Extraction Completes @@@@@@@@@@@@@@@@@@"
+
+################ STEP3: Zookeeper Configuration Copy ################
+echo
+echo "@@@@@@@@@@@@@@@@@@@ Zookeeper Configuration Installation @@@@@@@@@@@@@@@@"
+sh ./zk_config.sh | tee -a $loc_inst_logs_c
+_stat $? ZOOKEEPER_CONFIGURATION_INSTALLATION_PROCESS
+echo "@@@@@@@@@@@@@@@@@@@ Zookeeper Configuration Installation Completes @@@@@@@@@@@@@@@@@@"
+
+echo "############################################################"
+echo "#                                                          #"
+echo "############### INSTALLTION COMPLETES ######################"
+echo "#                                                          #"
+echo "############################################################"
+exit 0
+
+============================= zk_pre_ins.sh =================================
+#!/bin/sh
+#This is zk_pre_inst.sh script.
+#This script checks for existing installation and proceeds
+#to force installation or not accordingly.
+
+echo "############## ZOOKEEPER PRE INSTALLATION ############"
+
+############ INCLUDES #######################################
+source /appl/scripts/variables.sh
+
+##################### Variables ##########################
+loc_zk_ver=$chk_zk_version
+
+#---------------- Force Installation ---------------------
+if [ "$1" == 1 ]; then
+	echo "--------- Initiating Force Installation ------------"
+	var_path=()
+        var_path+=`find $base_dir -name $loc_zk_ver -type d | grep '.*'`
+        var_cmd=$?
+
+        echo "Command Output: $var_cmd"
+	#-------- Checking if Installation Found ---------
+	
+	#-------- Exisitng Installtion Found -------------
+	if [ $var_cmd == 0 ]; then
+		echo "Existing Installation Found at:"
+		echo $var_path
+		echo "Force Installation Instructions Provided"
+	
+		echo "Stopping Zookeeper Server if any running"
+		#-------- Stopping Zookeeper for each Existing Installtion-----
+		for i in "${var_path[@]}"
+		do
+		        temp_var=$i
+		        echo "$temp_var"
+			
+		        for word in $temp_var
+		        do
+		                echo $word
+		                loc_temp="$word/bin"
+		                cd $loc_temp
+		                echo "Current Working Directory:"
+		                pwd
+				
+		                sh ./zkServer.sh stop
+		        done
+		done
+		#--------------------------------------------------------------
+
+		echo "Starting Installation at mentioned directory..."
+		exit 0
+	fi
+	
+	#------- Existiing Installtion Not Found -------
+	if [ $var_cmd == 1 ]; then
+		echo "Existing Installation Not Found"
+                echo "Continue Installation..."
+		exit 0
+	fi
+fi
+
+#---------------- No Force Installation ---------------------
+if [ "$1" == 0 ]; then
+	echo "---------- No Force Installation ----------------"
+	var_path2=()
+	var_path2+=`find $base_dir -name $loc_zk_ver -type d | grep '.*'`
+	var_cmd2=$?
+	
+	echo "Command Output: $var_cmd2"
+
+	#-------- Checking For Existing Installation ------"	
+	if [ $var_cmd2 == 0 ]; then
+		echo "Existing Installation Found at: "
+		echo $var_path2
+		echo "No Force Installation Instruction Provided"
+		echo "Exiting the Installation Process..."
+		exit 1
+	fi
+
+	if [ $var_cmd2 == 1 ]; then
+		echo "Existing Installation Not Found"
+		echo "Continue Installation..."
+		exit 0
+	fi
+fi
+echo "After Exit Check"
+exit 0
+
+========================== zk_start.sh =========================================
+#!/bin/sh
+# This is Apache Zookeeper Server Start Script
+# Script is zk_start.sh
+# This script automatically starts apache zookeeper server
+# on one node
+
+echo "========================="
+echo "Starting Apache Zookeeper"
+echo "========================="
+
+################# INCLUDES #################################
+source /appl/scripts/variables.sh
+
+################ VARIABLES #################################
+spin="$scripts_dir/$name_spinner_script"
+loc_zk_ins_dir="$zk_dir/$name_zk_install_dir"
+loc_zk_bin_dir="$loc_zk_ins_dir/bin"
+loc_zk_start_logs="$zk_srvr_logs_dir/$name_zk_srvr_start_logs"
+
+############### Functions ##################################
+#_stat Function checks if the command has been executed
+#successfully or not
+_stat(){
+	if [ $1 -ne 0 ]; then
+        	echo "FAILED::: Could not complete the action: $2"
+		exit 1
+	else
+        	echo "Successfully Performed the action: $2"
+	fi
+}
+
+_srvr_stat(){
+        if [ $1 -ne 0 ]; then
+                echo "FAILED::: Could not complete the action: $2"
+                echo "$3"
+        else
+                echo "Successfully Performed the action: $2"
+                echo "$4"
+                exit 1
+        fi
+}
+
+############# Check for Server Mode ########################
+echo "Checking if Zookeeper Server is already running"
+echo srvr | nc localhost 2181
+
+_srvr_stat $? ZOOKEEPER_RUNNING_STATUS ZOOKEEPER_NOT_RUNNING ZOOKEEPER_ALREADY_RUNNING
+
+echo "Starting Zookeeper Server"
+
+echo "Traversing Zookeeper..."
+cd $loc_zk_bin_dir
+_stat $? TRAVERSING_TO_ZK_BIN
+
+echo "Initiating Script..."
+sh $loc_zk_bin_dir/zkServer.sh start
+_stat $? STARTING_ZOOKEEPER_SERVER
+
+echo "ZOOKEEPER SERVICE STARTED SUCCESSFULLY"
+exit 0
